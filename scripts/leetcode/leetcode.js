@@ -6,6 +6,8 @@ import {
   DIFFICULTY,
   getBrowser,
   getDifficulty,
+  getSolutionFilename,
+  getSubmissionIdFromUrl,
   isEmptyObject,
   LeetHubError,
   mergeStats,
@@ -189,11 +191,7 @@ const isCompleted = problemName => {
   return api.storage.local.get('stats').then(data => {
     if (data?.stats?.shas?.[problemName] == null) return false;
 
-    for (let file of Object.keys(data?.stats?.shas?.[problemName])) {
-      if (file.includes(problemName)) return true;
-    }
-
-    return false;
+    return data.stats.shas[problemName].difficulty != null;
   });
 };
 
@@ -450,7 +448,7 @@ function loader(leetCode) {
       if (!language) {
         throw new LeetHubError('LanguageNotFound');
       }
-      const filename = problemName + language;
+      const filename = getSolutionFilename(problemName, language, leetCode.solutionLabel);
 
       /* Upload README */
       const uploadReadMe = await api.storage.local.get('stats').then(({ stats }) => {
@@ -617,11 +615,12 @@ api.storage.local.get('isSync', data => {
 
 setupManualSubmitBtn(
   debounce(
-    () => {
+    solutionLabel => {
       const leetCode = new LeetCodeV2();
       // Manual submission event can only fire when we have submissionId. Simply retrieve it.
-      const submissionId = window.location.href.match(/leetcode\.com\/.*\/submissions\/(\d+)/)[1];
+      const submissionId = getSubmissionIdFromUrl(window.location.href);
       leetCode.submissionId = submissionId;
+      leetCode.solutionLabel = solutionLabel;
       loader(leetCode);
       return;
     },

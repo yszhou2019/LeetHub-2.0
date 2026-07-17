@@ -1,5 +1,9 @@
 
-import { appendProblemToReadme, sortTopicsInReadme } from '../scripts/leetcode/readmeTopics.js';
+import {
+  appendProblemToReadme,
+  getProblemNumberFromTopicRow,
+  sortTopicsInReadme,
+} from '../scripts/leetcode/readmeTopics.js';
 
 describe('appendProblemToReadme', () => {
   it('should correctly append to previous readme which has start and end tags', () => {
@@ -16,6 +20,18 @@ describe('appendProblemToReadme', () => {
     expect(output).toBe(expected)
   })
 })
+
+describe('getProblemNumberFromTopicRow', () => {
+  it('should parse problem numbers from topic rows', () => {
+    const row = '| [0001-two-sum](https://github.com/any/tree/master/0001-two-sum) |';
+    expect(getProblemNumberFromTopicRow(row)).toBe(1);
+  });
+
+  it('should not throw for rows without problem numbers', () => {
+    const row = '| [custom-label](https://github.com/any/tree/master/custom-label) |';
+    expect(getProblemNumberFromTopicRow(row)).toBe(Number.MAX_SAFE_INTEGER);
+  });
+});
 
 // describe('sort', () => {
   // it('should correctly sort previous readme which has start and end tags', () => {

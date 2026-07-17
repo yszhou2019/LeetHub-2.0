@@ -4,7 +4,10 @@ import {
   languages,
   addLeadingZeros,
   formatStats,
+  getLeetCodeGraphqlUrl,
+  getLeetCodeOrigin,
   getDifficulty,
+  LeetHubError,
 } from './util.js';
 
 /*
@@ -30,7 +33,7 @@ LeetCodeV1.prototype.findCode = function (commitMsg) {
   if (checkElem(e)) {
     // for normal problem submisson
     const submissionRef = e[1].innerHTML.split(' ')[1];
-    submissionURL = 'https://leetcode.com' + submissionRef.split('=')[1].slice(1, -1);
+    submissionURL = getLeetCodeOrigin() + submissionRef.split('=')[1].slice(1, -1);
   } else {
     // for a submission in explore section
     const submissionRef = document.getElementById('result-state');
@@ -116,7 +119,7 @@ LeetCodeV1.prototype.getLanguageExtension = function () {
    this is because the dom is populated after data is fetched by opening the note */
 LeetCodeV1.prototype.getNotesIfAny = function () {
   // there are no notes on expore
-  if (document.URL.startsWith('https://leetcode.com/explore/')) return '';
+  if (document.URL.startsWith(`${getLeetCodeOrigin()}/explore/`)) return '';
 
   let notes = '';
   if (
@@ -271,7 +274,7 @@ LeetCodeV1.prototype.injectSpinnerStyle = function () {
 };
 /* Inserts an anchor element that is specific to the page you are on (e.g. Explore) */
 LeetCodeV1.prototype.insertToAnchorElement = function (elem) {
-  if (document.URL.startsWith('https://leetcode.com/explore/')) {
+  if (document.URL.startsWith(`${getLeetCodeOrigin()}/explore/`)) {
     const action = document.getElementsByClassName('action');
     if (
       checkElem(action) &&
@@ -318,16 +321,58 @@ function LeetCodeV2() {
   this.progressSpinnerElementClass = 'leethub_progress';
   this.injectSpinnerStyle();
 }
+function isLeetCodeCn() {
+  return window.location.hostname === 'leetcode.cn';
+}
+
+function normalizeLeetCodeCnSubmissionData(submissionData, questionData) {
+  const question = submissionData.question || {};
+  const topicTags = questionData?.topicTags || [];
+
+  return {
+    runtimeDisplay: submissionData.runtime,
+    runtimePercentile: null,
+    memoryDisplay: submissionData.memory,
+    memoryPercentile: null,
+    code: submissionData.code,
+    timestamp: submissionData.timestamp,
+    statusCode: submissionData.statusDisplay,
+    lang: {
+      name: submissionData.lang,
+      verboseName: submissionData.lang,
+    },
+    question: {
+      questionId: question.questionId,
+      questionFrontendId: questionData?.questionFrontendId,
+      title: question.translatedTitle || question.title,
+      titleSlug: question.titleSlug,
+      content: questionData?.translatedContent || questionData?.content,
+      difficulty: questionData?.difficulty,
+      topicTags,
+    },
+    notes: undefined,
+    topicTags,
+  };
+}
+
 LeetCodeV2.prototype.init = async function () {
   const submissionId = this.submissionId;
+  const isCn = isLeetCodeCn();
 
   // Query for getting the solution runtime and memory stats, the code, the coding language, the question id, question title and question difficulty
-  const submissionDetailsQuery = {
-    query:
-      '\n    query submissionDetails($submissionId: Int!) {\n  submissionDetails(submissionId: $submissionId) {\n    runtime\n    runtimeDisplay\n    runtimePercentile\n    runtimeDistribution\n    memory\n    memoryDisplay\n    memoryPercentile\n    memoryDistribution\n    code\n    timestamp\n    statusCode\n    lang {\n      name\n      verboseName\n    }\n    question {\n      questionId\n    title\n    titleSlug\n    content\n    difficulty\n  topicTags {\n    name\n    slug\n    }\n   }\n    notes\n    topicTags {\n      tagId\n      slug\n      name\n    }\n    runtimeError\n  }\n}\n    ',
-    variables: { submissionId: submissionId },
-    operationName: 'submissionDetails',
-  };
+  const submissionDetailsQuery = isCn
+    ? {
+        query:
+          '\n    query mySubmissionDetail($id: ID!) {\n  submissionDetail(submissionId: $id) {\n    code\n    runtime\n    memory\n    statusDisplay\n    timestamp\n    lang\n    question {\n      questionId\n      title\n      translatedTitle\n      titleSlug\n    }\n  }\n}\n    ',
+        variables: { id: String(submissionId) },
+        operationName: 'mySubmissionDetail',
+      }
+    : {
+        query:
+          '\n    query submissionDetails($submissionId: Int!) {\n  submissionDetails(submissionId: $submissionId) {\n    runtime\n    runtimeDisplay\n    runtimePercentile\n    runtimeDistribution\n    memory\n    memoryDisplay\n    memoryPercentile\n    memoryDistribution\n    code\n    timestamp\n    statusCode\n    lang {\n      name\n      verboseName\n    }\n    question {\n      questionId\n    title\n    titleSlug\n    content\n    difficulty\n  topicTags {\n    name\n    slug\n    }\n   }\n    notes\n    topicTags {\n      tagId\n      slug\n      name\n    }\n    runtimeError\n  }\n}\n    ',
+        variables: { submissionId: submissionId },
+        operationName: 'submissionDetails',
+      };
   const submissionDetailsOptions = {
     method: 'POST',
     headers: {
@@ -336,14 +381,20 @@ LeetCodeV2.prototype.init = async function () {
     },
     body: JSON.stringify(submissionDetailsQuery),
   };
-  const submissionData = await fetch('https://leetcode.com/graphql/', submissionDetailsOptions)
+  const graphqlUrl = getLeetCodeGraphqlUrl();
+  const submissionData = await fetch(graphqlUrl, submissionDetailsOptions)
     .then(res => res.json())
-    .then(res => res.data.submissionDetails)
+    .then(res => (isCn ? res.data.submissionDetail : res.data.submissionDetails))
+
+  if (!submissionData) {
+    throw new LeetHubError('SubmissionDetailsNotFound');
+  }
     
   // Query for getting question details mainly frontendId
   // TODO: maybe handle a case where submissionData.question does not exist (e.g. LeetCode changes structure of response object)
   const questionDetailsQuery = {
-    query: "\n    query questionDetail($titleSlug: String!) {\n  languageList {\n    id\n    name\n  }\n  submittableLanguageList {\n    id\n    name\n    verboseName\n  }\n  statusList {\n    id\n    name\n  }\n  questionDiscussionTopic(questionSlug: $titleSlug) {\n    id\n    commentCount\n    topLevelCommentCount\n  }\n  ugcArticleOfficialSolutionArticle(questionSlug: $titleSlug) {\n    uuid\n    chargeType\n    canSee\n    hasVideoArticle\n  }\n  question(titleSlug: $titleSlug) {\n    title\n    titleSlug\n    questionId\n    questionFrontendId\n    questionTitle\n    translatedTitle\n    content\n    translatedContent\n    categoryTitle\n    difficulty\n    stats\n    companyTagStatsV2\n    topicTags {\n      name\n      slug\n      translatedName\n    }\n    similarQuestionList {\n      difficulty\n      titleSlug\n      title\n      translatedTitle\n      isPaidOnly\n    }\n    mysqlSchemas\n    dataSchemas\n    frontendPreviews\n    likes\n    dislikes\n    isPaidOnly\n    status\n    canSeeQuestion\n    enableTestMode\n    metaData\n    enableRunCode\n    enableSubmit\n    enableDebugger\n    envInfo\n    isLiked\n    nextChallenges {\n      difficulty\n      title\n      titleSlug\n      questionFrontendId\n    }\n    libraryUrl\n    adminUrl\n    hints\n    codeSnippets {\n      code\n      lang\n      langSlug\n    }\n    exampleTestcaseList\n    hasFrontendPreview\n    featuredContests {\n      titleSlug\n      title\n    }\n  }\n}\n    ",
+    query:
+      '\n    query questionDetail($titleSlug: String!) {\n  question(titleSlug: $titleSlug) {\n    questionFrontendId\n    content\n    translatedContent\n    difficulty\n    topicTags {\n      name\n      slug\n      translatedName\n    }\n  }\n}\n    ',
     variables: { titleSlug: submissionData.question.titleSlug },
     operationName: 'questionDetail',
   };
@@ -355,11 +406,16 @@ LeetCodeV2.prototype.init = async function () {
     },
     body: JSON.stringify(questionDetailsQuery),
   };
-  const frontendId = await fetch('https://leetcode.com/graphql/', questionDetailsOptions)
+  const questionData = await fetch(graphqlUrl, questionDetailsOptions)
     .then(res => res.json())
-    .then(res => res.data.question.questionFrontendId)
-    
-  submissionData.question.questionFrontendId = frontendId;
+    .then(res => res.data.question)
+
+  if (isCn) {
+    this.submissionData = normalizeLeetCodeCnSubmissionData(submissionData, questionData);
+    return;
+  }
+
+  submissionData.question.questionFrontendId = questionData.questionFrontendId;
 
   this.submissionData = submissionData;
 };
@@ -420,9 +476,13 @@ LeetCodeV2.prototype.getSuccessStateAndUpdate = function () {
 LeetCodeV2.prototype.parseStats = function () {
   if (this.submissionData != null) {
     const runtimePercentile =
-      Math.round((this.submissionData.runtimePercentile + Number.EPSILON) * 100) / 100;
+      typeof this.submissionData.runtimePercentile === 'number'
+        ? Math.round((this.submissionData.runtimePercentile + Number.EPSILON) * 100) / 100
+        : 'N/A';
     const spacePercentile =
-      Math.round((this.submissionData.memoryPercentile + Number.EPSILON) * 100) / 100;
+      typeof this.submissionData.memoryPercentile === 'number'
+        ? Math.round((this.submissionData.memoryPercentile + Number.EPSILON) * 100) / 100
+        : 'N/A';
     return formatStats(
       this.submissionData.runtimeDisplay,
       runtimePercentile,
@@ -517,7 +577,7 @@ LeetCodeV2.prototype.injectSpinnerStyle = function () {
   document.head.append(style);
 };
 LeetCodeV2.prototype.insertToAnchorElement = function (elem) {
-  if (document.URL.startsWith('https://leetcode.com/explore/')) {
+  if (document.URL.startsWith(`${getLeetCodeOrigin()}/explore/`)) {
     // TODO: support spinner when answering problems on Explore pages
     //   action = document.getElementsByClassName('action');
     //   if (

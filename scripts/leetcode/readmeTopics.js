@@ -4,6 +4,11 @@ const leetCodeSectionStart = `<!---LeetCode Topics Start-->`;
 const leetCodeSectionHeader = `# LeetCode Topics`;
 const leetCodeSectionEnd = `<!---LeetCode Topics End-->`;
 
+function getProblemNumberFromTopicRow(row) {
+  const match = row.match(/\/(\d+)-/);
+  return match ? parseInt(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
 function appendProblemToReadme(topic, markdownFile, hook, problem) {
   const url = `https://github.com/${hook}/tree/master/${problem}`;
   const topicHeader = `## ${topic}`;
@@ -127,8 +132,8 @@ function sortTopicsInReadme(markdownFile) {
     lines = lines.slice(2);
 
     lines.sort((a, b) => {
-      let numA = parseInt(a.match(/\/(\d+)-/)[1]);
-      let numB = parseInt(b.match(/\/(\d+)-/)[1]);
+      let numA = getProblemNumberFromTopicRow(a);
+      let numB = getProblemNumberFromTopicRow(b);
       return numA - numB;
     });
 
@@ -145,4 +150,4 @@ function sortTopicsInReadme(markdownFile) {
   return markdownFile;
 }
 
-export { appendProblemToReadme, sortTopicsInReadme };
+export { appendProblemToReadme, getProblemNumberFromTopicRow, sortTopicsInReadme };

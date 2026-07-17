@@ -1,4 +1,4 @@
-import { getBrowser } from "./util.js";
+import { getBrowser, getSubmissionIdFromUrl } from './util.js';
 
 let api = getBrowser()
 
@@ -10,7 +10,7 @@ const createToolTip = () => {
   const toolTip = document.createElement('div');
   toolTip.id = 'leethub-upload-tooltip';
   toolTip.textContent =
-    'Manually upload this submission to GitHub (beta).\nThis will OVERWRITE your current submission.\nPlease be mindful of your GitHub rate-limits.';
+    'Manually upload this submission to GitHub (beta).\nIf label is set, upload as label.language.\nPlease be mindful of your GitHub rate-limits.';
   toolTip.className =
     'fixed bg-sd-popover text-sd-popover-foreground rounded-sd-md z-modal text-xs text-left font-normal whitespace-pre-line shadow p-3 border-sd-border border cursor-default translate-y-20 transition-opacity opacity-0 transition-delay-1000 duration-300 group-hover:opacity-100';
   return toolTip;
@@ -38,9 +38,70 @@ const createGitIcon = () => {
   return uploadIcon;
 };
 
+const isDarkTheme = () => {
+  return (
+    document.documentElement.classList.contains('dark') ||
+    document.body.classList.contains('dark') ||
+    document.documentElement.dataset.theme === 'dark' ||
+    document.body.dataset.theme === 'dark' ||
+    window.matchMedia?.('(prefers-color-scheme: dark)').matches
+  );
+};
+
+const applyLabelInputTheme = input => {
+  const dark = isDarkTheme();
+  input.style.color = dark ? '#f0f6fc' : '#24292f';
+  input.style.backgroundColor = dark ? '#1f2937' : '#ffffff';
+  input.style.borderColor = dark ? '#4b5563' : '#d0d7de';
+  input.style.setProperty('--leethub-label-placeholder-color', dark ? '#9ca3af' : '#57606a');
+};
+
+const injectLabelInputStyle = () => {
+  if (document.getElementById('leethub-label-input-style')) return;
+
+  const style = document.createElement('style');
+  style.id = 'leethub-label-input-style';
+  style.textContent =
+    '#leethub-solution-label::placeholder { color: var(--leethub-label-placeholder-color); opacity: 1; }';
+  document.head.append(style);
+};
+
+const observeLabelInputTheme = input => {
+  const observer = new MutationObserver(() => applyLabelInputTheme(input));
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class', 'data-theme'],
+  });
+
+  if (document.body) {
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme'],
+    });
+  }
+};
+
+const createLabelInput = () => {
+  const input = document.createElement('input');
+  input.id = 'leethub-solution-label';
+  input.type = 'text';
+  input.placeholder = 'label';
+  input.setAttribute(
+    'style',
+    'width: 120px; border: 1px solid; border-radius: 6px; padding: 4px 8px; font-size: 12px;'
+  );
+  input.addEventListener('click', event => event.stopPropagation());
+  injectLabelInputStyle();
+  applyLabelInputTheme(input);
+  observeLabelInputTheme(input);
+  return input;
+};
+
 function addManualSubmitBtn(eventHandler) {
   const btns = getSubmissionPageBtns();
-  if (btns.innerText.includes('Solution') && !btns.innerText.includes('LeetHub')) {
+  if (btns && !document.getElementById('leethub-solution-label')) {
+    const labelInput = createLabelInput();
+    btns.appendChild(labelInput);
     btns.appendChild(
       (() => {
         const btn = document.createElement('button');
@@ -53,7 +114,7 @@ function addManualSubmitBtn(eventHandler) {
 
         btn.prepend(createGitIcon());
         btn.appendChild(createToolTip());
-        btn.addEventListener('click', eventHandler);
+        btn.addEventListener('click', () => eventHandler(labelInput.value));
         return btn;
       })()
     );
@@ -66,7 +127,7 @@ function setupManualSubmitBtn(submitBtnHandler) {
     const url = window.location.href;
     const btns = getSubmissionPageBtns();
 
-    if (btns && btns.children.length < 3 && url.match(/\/submissions\//)) {
+    if (btns && url.match(/\/submissions\//)) {
       observer.disconnect();
       addManualSubmitBtn(submitBtnHandler);
     }
@@ -75,7 +136,7 @@ function setupManualSubmitBtn(submitBtnHandler) {
   // For continued SPA use, detect when LeetCode dynamic layout loads, set up click listener, then listen for btns. 
   const pageObserver = new MutationObserver((_, observer) => {
     // Display submission button on refresh trigger
-    if (window.location.href.match(/leetcode\.com\/(.*)\/submissions\/(\d+)/)) {
+    if (getSubmissionIdFromUrl(window.location.href)) {
       submissionPageBtnsObserver.observe(document.body, {
         childList: true,
         subtree: true,

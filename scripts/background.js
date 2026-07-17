@@ -41,11 +41,16 @@ function handleMessage(request, sender, sendResponse) {
   } else if (request.type === 'LEETCODE_SUBMISSION') {
     api.webNavigation.onHistoryStateUpdated.addListener(
       (e = function (details) {
-        const submissionId = details.url.match(/\/submissions\/(\d+)\//)[1];
+        const submissionId = details.url.match(/\/submissions\/(\d+)\/?/)?.[1];
         sendResponse({ submissionId });
         api.webNavigation.onHistoryStateUpdated.removeListener(e);
       }),
-      { url: [{ hostSuffix: 'leetcode.com' }, { pathContains: 'submissions' }] }
+      {
+        url: [
+          { hostSuffix: 'leetcode.com', pathContains: 'submissions' },
+          { hostSuffix: 'leetcode.cn', pathContains: 'submissions' },
+        ],
+      }
     );
   }
   return true;

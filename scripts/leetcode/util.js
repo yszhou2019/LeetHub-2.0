@@ -2,28 +2,40 @@
 const languages = Object.freeze({
   C: '.c',
   'C++': '.cpp',
+  cpp: '.cpp',
   'C#': '.cs',
+  csharp: '.cs',
   Dart: '.dart',
+  dart: '.dart',
   Elixir: '.ex',
   Erlang: '.erl',
   Go: '.go',
+  golang: '.go',
   Java: '.java',
+  java: '.java',
   JavaScript: '.js',
   Javascript: '.js',
+  javascript: '.js',
   Kotlin: '.kt',
   MySQL: '.sql',
   'MS SQL Server': '.sql',
   Oracle: '.sql',
   Pandas: '.py',
   PHP: '.php',
+  php: '.php',
   Python: '.py',
   Python3: '.py',
+  python: '.py',
+  python3: '.py',
   Racket: '.rkt',
   Ruby: '.rb',
+  ruby: '.rb',
   Rust: '.rs',
+  rust: '.rs',
   Scala: '.scala',
   Swift: '.swift',
   TypeScript: '.ts',
+  typescript: '.ts',
 });
 
 /** @enum */
@@ -158,6 +170,27 @@ function formatStats(time, timePercentile, space, spacePercentile) {
   return `Time: ${time} (${timePercentile}%), Space: ${space} (${spacePercentile}%) - LeetHub`;
 }
 
+function isLeetCodeHost(hostname = window.location.hostname) {
+  return hostname === 'leetcode.com' || hostname === 'leetcode.cn';
+}
+
+function getLeetCodeOrigin() {
+  return isLeetCodeHost() ? window.location.origin : 'https://leetcode.com';
+}
+
+function getLeetCodeGraphqlUrl() {
+  return `${getLeetCodeOrigin()}/graphql/`;
+}
+
+function getSubmissionIdFromUrl(url = window.location.href) {
+  return url.match(/leetcode\.(?:com|cn)\/.*\/submissions\/(\d+)/)?.[1];
+}
+
+function getSolutionFilename(problemName, language, label) {
+  const slug = convertToSlug(label || '');
+  return `${slug || problemName}${language}`;
+}
+
 function isObject(obj) {
   return obj && typeof obj === 'object' && !Array.isArray(obj);
 }
@@ -218,6 +251,11 @@ export {
   formatStats,
   getBrowser,
   getDifficulty,
+  getLeetCodeGraphqlUrl,
+  getLeetCodeOrigin,
+  getSolutionFilename,
+  getSubmissionIdFromUrl,
+  isLeetCodeHost,
   isEmptyObject,
   languages,
   LeetHubError,

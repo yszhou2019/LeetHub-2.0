@@ -1,4 +1,8 @@
-import { mergeStats } from '../scripts/leetcode/util.js';
+import {
+  getSolutionFilename,
+  getSubmissionIdFromUrl,
+  mergeStats,
+} from '../scripts/leetcode/util.js';
 
 describe('mergeStats', () => {
   it('should correctly merge stats', () => {
@@ -228,5 +232,29 @@ describe('mergeStats', () => {
       hard: 0,
       solved: 3,
     });
+  });
+});
+
+describe('getSolutionFilename', () => {
+  it('should use the label as the solution filename when provided', () => {
+    expect(getSolutionFilename('0001-two-sum', '.cpp', 'Two Pointers')).toBe('two-pointers.cpp');
+  });
+
+  it('should fall back to the problem name when label is empty', () => {
+    expect(getSolutionFilename('0001-two-sum', '.cpp', '')).toBe('0001-two-sum.cpp');
+  });
+});
+
+describe('getSubmissionIdFromUrl', () => {
+  it('should parse leetcode.com submission urls', () => {
+    expect(
+      getSubmissionIdFromUrl('https://leetcode.com/problems/two-sum/submissions/123456789/')
+    ).toBe('123456789');
+  });
+
+  it('should parse leetcode.cn submission urls', () => {
+    expect(
+      getSubmissionIdFromUrl('https://leetcode.cn/problems/two-sum/submissions/123456789')
+    ).toBe('123456789');
   });
 });
