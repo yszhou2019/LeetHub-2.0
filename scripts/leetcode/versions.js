@@ -344,9 +344,9 @@ function normalizeLeetCodeCnSubmissionData(submissionData, questionData) {
     question: {
       questionId: question.questionId,
       questionFrontendId: questionData?.questionFrontendId,
-      title: question.translatedTitle || question.title,
+      title: question.title || question.translatedTitle,
       titleSlug: question.titleSlug,
-      content: questionData?.translatedContent || questionData?.content,
+      content: questionData?.content || questionData?.translatedContent,
       difficulty: questionData?.difficulty,
       topicTags,
     },
@@ -616,4 +616,4 @@ LeetCodeV2.prototype.markUploadFailed = function () {
   }
 };
 
-export { LeetCodeV1, LeetCodeV2 };
+export { LeetCodeV1, LeetCodeV2, normalizeLeetCodeCnSubmissionData };
